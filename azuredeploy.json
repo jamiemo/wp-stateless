@@ -1,0 +1,466 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-08-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "siteName": {
+            "defaultValue": "wp-<sitename>",
+            "type": "String",
+            "minLength": 5,
+            "metadata": {
+                "description": "Specifies the name of the App Service."
+            }
+        },
+        "storageAccountName": {
+            "type": "string",
+            "defaultValue": "wp<sitename>",
+            "minLength": 5,
+            "metadata": {
+                "description": "Specifies the name of the Azure Storage account. Letters and numbers only."
+            }
+        },
+        "dnsZoneName": {
+            "defaultValue": "<sitename>.com",
+            "type": "String",
+            "minLength": 5,
+            "metadata": {
+                "description": "Specifies the fully qualified domain name."
+            }
+        },
+        "deployDnsZone": {
+            "defaultValue": false,
+            "type": "bool",
+            "metadata": {
+                "description": "Specifies whether to deploy a public DNS zone. Domains purchased through App Service Domains will have this pre-created."
+            }
+        },
+        "databaseName": {
+            "defaultValue": "wordpress",
+            "type": "string",
+            "maxLength": 63,
+            "minLength": 3,
+            "metadata": {
+                "description": "Specifies the name of the database."
+            }
+        },
+        "administratorLogin": {
+            "defaultValue": "wpadmin",
+            "type": "string",
+            "minLength": 1,
+            "metadata": {
+                "description": "Database administrator login name"
+            }
+        },
+        "administratorLoginPassword": {
+            "defaultValue": "[uniqueString(resourceGroup().id, deployment().name)]",
+            "type": "secureString",
+            "minLength": 8,
+            "metadata": {
+                "description": "Database administrator password"
+            }
+        }
+    },
+    "variables": {
+        "serverfarmName": "[format('{0}-plan', parameters('siteName'))]",
+        "flexibleServerName": "[format('{0}-db', parameters('siteName'))]",
+        "virtualNetworkName": "[format('{0}-vnet', parameters('siteName'))]",
+        "virtualNetworkSubnet": "[format('{0}-subnet', parameters('siteName'))]",
+        "fileShareName": "wp-content"
+    },
+    "resources": [
+        {
+            "type": "Microsoft.DBforMySQL/flexibleServers",
+            "apiVersion": "2021-05-01",
+            "name": "[variables('flexibleServerName')]",
+            "location": "[resourceGroup().location]",
+            "sku": {
+                "name": "Standard_B1s",
+                "tier": "Burstable"
+            },
+            "properties": {
+                "administratorLogin": "[parameters('administratorLogin')]",
+                "administratorLoginPassword": "[parameters('administratorLoginPassword')]",
+                "storage": {
+                    "storageSizeGB": 20,
+                    "iops": 360,
+                    "autoGrow": "Enabled"
+                },
+                "version": "5.7",
+                "availabilityZone": "1",
+                "replicationRole": "None",
+                "network": {},
+                "backup": {
+                    "backupRetentionDays": 30,
+                    "geoRedundantBackup": "Disabled"
+                },
+                "highAvailability": {
+                    "mode": "Disabled"
+                }
+            }
+        },
+        {
+            "type": "Microsoft.DBforMySQL/flexibleServers/databases",
+            "apiVersion": "2021-05-01",
+            "name": "[concat(variables('flexibleServerName'), '/', parameters('databaseName'))]",
+            "dependsOn": [
+                "[resourceId('Microsoft.DBforMySQL/flexibleServers', variables('flexibleServerName'))]"
+            ],
+            "properties": {
+                "charset": "utf8",
+                "collation": "utf8_general_ci"
+            }
+        },
+        {
+            "type": "Microsoft.Authorization/locks",
+            "apiVersion": "2017-04-01",
+            "scope": "[concat('Microsoft.DBforMySQL/flexibleServers/', variables('flexibleServerName'), '/databases/', parameters('databaseName'))]",
+            "name": "[concat(variables('flexibleServerName'), '-lock')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.DBforMySQL/flexibleServers/databases', variables('flexibleServerName'), parameters('databaseName'))]"
+            ],
+            "properties": {
+                "level": "CanNotDelete",
+                "notes": "Ensure data has been backed up before deleting."
+            }
+        },
+        {
+            "type": "Microsoft.DBforMySQL/flexibleServers/configurations",
+            "apiVersion": "2021-05-01",
+            "name": "[concat(variables('flexibleServerName'), '/require_secure_transport')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.DBforMySQL/flexibleServers', variables('flexibleServerName'))]"
+            ],
+            "properties": {
+                "source": "user-override",
+                "value": "OFF"
+            }
+        },
+        {
+
+            "type": "Microsoft.DBforMySQL/flexibleServers/firewallRules",
+            "name": "[concat(variables('flexibleServerName'), '/AllowAllWindowsAzureIps')]",
+            "apiVersion": "2021-05-01",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "[resourceId('Microsoft.DBforMySQL/flexibleServers', variables('flexibleServerName'))]"
+            ],
+            "properties": {
+                "startIpAddress": "0.0.0.0",
+                "endIpAddress": "0.0.0.0"
+            }
+        },
+        {
+            "type": "Microsoft.Network/dnszones",
+            "apiVersion": "2018-05-01",
+            "name": "[parameters('dnsZoneName')]",
+            "condition": "[parameters('deployDnsZone')]",
+            "location": "global",
+            "properties": {
+                "zoneType": "Public"
+            }
+        },
+        {
+            "type": "Microsoft.Network/dnsZones/TXT",
+            "apiVersion": "2018-05-01",
+            "name": "[format('{0}/asuid', parameters('dnsZoneName'))]",
+            "properties": {
+                "TTL": 3600,
+                "TXTRecords": [
+                    {
+                        "value": [
+                            "[format('{0}', reference(resourceId('Microsoft.Web/sites', parameters('siteName'))).customDomainVerificationId)]"
+                        ]
+                    }
+                ]
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/sites', parameters('siteName'))]"
+            ]
+        },
+        {
+            "type": "Microsoft.Network/dnsZones/A",
+            "apiVersion": "2018-05-01",
+            "name": "[concat(parameters('dnsZoneName'), '/@')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/dnsZones', parameters('dnsZoneName'))]"
+            ],
+            "properties": {
+                "TTL": 3600,
+                "ARecords": [
+                    {
+                        "ipv4Address": "[format('{0}', reference(resourceId('Microsoft.Web/sites', parameters('siteName'))).inboundIpAddress)]"
+                    }
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Storage/storageAccounts",
+            "apiVersion": "2021-08-01",
+            "name": "[parameters('storageAccountName')]",
+            "location": "[resourceGroup().location]",
+            "sku": {
+                "name": "Standard_LRS",
+                "tier": "Standard"
+            },
+            "kind": "StorageV2",
+            "properties": {
+                "defaultToOAuthAuthentication": false,
+                "allowCrossTenantReplication": true,
+                "minimumTlsVersion": "TLS1_2",
+                "allowBlobPublicAccess": true,
+                "allowSharedKeyAccess": true,
+                "networkAcls": {
+                    "resourceAccessRules": [],
+                    "bypass": "AzureServices",
+                    "ipRules": [],
+                    "defaultAction": "Allow"
+                },
+                "supportsHttpsTrafficOnly": true,
+                "encryption": {
+                    "requireInfrastructureEncryption": false,
+                    "services": {
+                        "file": {
+                            "keyType": "Account",
+                            "enabled": true
+                        }
+                    },
+                    "keySource": "Microsoft.Storage"
+                },
+                "accessTier": "Hot"
+            }
+        },
+        {
+            "name": "[concat(parameters('storageAccountName'), '/default')]",
+            "type": "Microsoft.Storage/storageAccounts/fileServices",
+            "apiVersion": "2021-05-01",
+            "properties": {
+                "shareDeleteRetentionPolicy": {
+                    "enabled": true,
+                    "days": 30
+                }
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName'))]"
+            ]
+        },
+        {
+            "type": "Microsoft.Storage/storageAccounts/fileServices/shares",
+            "apiVersion": "2021-04-01",
+            "name": "[format('{0}/default/{1}', parameters('storageAccountName'), variables('fileShareName'))]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts/fileServices', parameters('storageAccountName'), 'default')]"
+            ]
+        },
+        {
+            "type": "Microsoft.Authorization/locks",
+            "apiVersion": "2017-04-01",
+            "scope": "[concat('Microsoft.Storage/storageAccounts/', parameters('storageAccountName'), '/fileServices/default/shares/', variables('fileShareName'))]",
+            "name": "[concat(parameters('storageAccountName'), '-lock')]",
+            "properties": {
+                "level": "CanNotDelete",
+                "notes": "Ensure data has been backed up before deleting."
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts/fileServices/shares', parameters('storageAccountName'), 'default', variables('fileShareName'))]"
+            ]
+        },
+        {
+            "type": "Microsoft.Web/serverfarms",
+            "apiVersion": "2021-03-01",
+            "name": "[variables('serverfarmName')]",
+            "location": "[resourceGroup().location]",
+            "sku": {
+                "name": "B1",
+                "tier": "Basic",
+                "size": "B1",
+                "family": "B",
+                "capacity": 1
+            },
+            "kind": "linux",
+            "properties": {
+                "perSiteScaling": false,
+                "elasticScaleEnabled": false,
+                "maximumElasticWorkerCount": 1,
+                "isSpot": false,
+                "reserved": true,
+                "isXenon": false,
+                "hyperV": false,
+                "targetWorkerCount": 0,
+                "targetWorkerSizeId": 0,
+                "zoneRedundant": false
+            }
+        },
+        {
+            "type": "Microsoft.Web/sites",
+            "apiVersion": "2021-03-01",
+            "name": "[parameters('siteName')]",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/serverfarms', variables('serverfarmName'))]"
+            ],
+            "kind": "app,linux",
+            "properties": {
+                "enabled": true,
+                "hostNameSslStates": [
+                    {
+                        "name": "[concat(parameters('siteName'), '.azurewebsites.net')]",
+                        "sslState": "Disabled",
+                        "hostType": "Standard"
+                    },
+                    {
+                        "name": "[concat(parameters('siteName'), '.scm.azurewebsites.net')]",
+                        "sslState": "Disabled",
+                        "hostType": "Repository"
+                    }
+                ],
+                "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', variables('serverfarmName'))]",
+                "reserved": true,
+                "isXenon": false,
+                "hyperV": false,
+                "siteConfig": {
+                    "numberOfWorkers": 1,
+                    "linuxFxVersion": "PHP|7.4",
+                    "acrUseManagedIdentityCreds": false,
+                    "alwaysOn": true,
+                    "http20Enabled": true,
+                    "functionAppScaleLimit": 0,
+                    "minimumElasticInstanceCount": 0,
+                    "appSettings": [
+                        {
+                            "name": "DB_HOST",
+                            "value": "[reference(resourceId('Microsoft.DBforMySQL/flexibleServers', variables('flexibleServerName')), '2021-05-01', 'Full').properties.fullyQualifiedDomainName]"
+                        },
+                        {
+                            "name": "DB_NAME",
+                            "value": "[parameters('databaseName')]"
+                        },
+                        {
+                            "name": "DB_USER",
+                            "value": "[parameters('administratorLogin')]"
+                        },
+                        {
+                            "name": "DB_PASSWORD",
+                            "value": "[parameters('administratorLoginPassword')]"
+                        },
+                        {
+                            "name": "PRE_BUILD_COMMAND",
+                            "value": "for DIRECTORY in $(ls -d /home/site/wwwroot/*/ | grep -v wp-content); do rm -rf $DIRECTORY; done; for FILE in $(ls /home/site/wwwroot/* | grep -v wp-content); do rm -f $FILE; done"
+                        },
+                        {
+                            "name": "POST_BUILD_COMMAND",
+                            "value": "mv -v ./wordpress/* . ; mv -v ./wp-config-sample.php ./wp-config.php ; sed -i \"s/define( 'DB_NAME',.*/define( 'DB_NAME', getenv('DB_NAME') );/\" ./wp-config.php ; sed -i \"s/define( 'DB_USER',.*/define( 'DB_USER', getenv('DB_USER') );/\" ./wp-config.php ; sed -i \"s/define( 'DB_PASSWORD',.*/define( 'DB_PASSWORD', getenv('DB_PASSWORD') );/\" ./wp-config.php ; sed -i \"s/define( 'DB_HOST',.*/define( 'DB_HOST', getenv('DB_HOST') );/\" ./wp-config.php ; sed -i \"s/put your unique phrase here/$WEBSITE_AUTH_ENCRYPTION_KEY/g\" ./wp-config.php; rm -rf ./wordpress/; grep -q \"Azure App Service HTTPS\" /home/site/wwwroot/.htaccess || echo -e '\\n\\n# BEGIN Azure App Service HTTPS\\n<IfModule mod_setenvif.c>\\nSetEnvIf X-Forwarded-Proto \"^https$\" HTTPS\\n</IfModule>\\n# END Azure App Service HTTPS' >> /home/site/wwwroot/.htaccess"
+                        },
+                        {
+                            "name": "ENABLE_ORYX_BUILD",
+                            "value": "true"
+                        },
+                        {
+                            "name": "SCM_DO_BUILD_DURING_DEPLOYMENT",
+                            "value": "true"
+                        }
+                    ]
+                },
+                "scmSiteAlsoStopped": false,
+                "clientAffinityEnabled": false,
+                "clientCertEnabled": false,
+                "clientCertMode": "Required",
+                "hostNamesDisabled": false,
+                "containerSize": 0,
+                "dailyMemoryTimeQuota": 0,
+                "httpsOnly": false,
+                "redundancyMode": "None",
+                "storageAccountRequired": false,
+                "keyVaultReferenceIdentity": "SystemAssigned"
+            }
+        },
+        {
+            "type": "Microsoft.Web/sites/config",
+            "apiVersion": "2021-03-01",
+            "name": "[concat(parameters('siteName'), '/web')]",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/sites', parameters('siteName'))]"
+            ],
+            "properties": {
+                "azureStorageAccounts": {
+                    "[variables('fileShareName')]": {
+                        "type": "AzureFiles",
+                        "accountName": "[parameters('storageAccountName')]",
+                        "shareName": "[variables('fileShareName')]",
+                        "mountPath": "[concat('/home/site/wwwroot/', variables('fileShareName'))]",
+                        "accessKey": "[listKeys(resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName')), '2019-04-01').keys[0].value]"
+                    }
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Web/sites/hostNameBindings",
+            "apiVersion": "2021-03-01",
+            "name": "[concat(parameters('siteName'), '/', parameters('siteName'), '.azurewebsites.net')]",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/sites', parameters('siteName'))]"
+            ],
+            "properties": {
+                "siteName": "[parameters('siteName')]",
+                "hostNameType": "Verified"
+            }
+        },
+        {
+            "type": "Microsoft.Web/sites/hostNameBindings",
+            "apiVersion": "2021-03-01",
+            "name": "[concat(parameters('siteName'), '/', parameters('dnsZoneName'))]",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/sites', parameters('siteName'))]",
+                "[resourceId('Microsoft.Network/dnsZones/A', parameters('dnsZoneName'), '@')]",
+                "[resourceId('Microsoft.Network/dnsZones/TXT', parameters('dnsZoneName'), 'asuid')]",
+                "[resourceId('Microsoft.Web/sites/hostNameBindings', parameters('siteName'), concat(parameters('siteName'), '.azurewebsites.net'))]"
+            ],
+            "properties": {
+                "siteName": "[parameters('siteName')]",
+                "hostNameType": "Verified"
+            }
+        },
+        {
+            "apiVersion": "2020-12-01",
+            "location": "[resourceGroup().location]",
+            "name": "[concat(parameters('dnsZoneName'), '-cert')]",
+            "type": "Microsoft.Web/certificates",
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/serverfarms', variables('serverfarmName'))]",
+                "[resourceId('Microsoft.Network/dnsZones/A', parameters('dnsZoneName'), '@')]",
+                "[resourceId('Microsoft.Network/dnsZones/TXT', parameters('dnsZoneName'), 'asuid')]",
+                "[resourceId('Microsoft.Web/sites/hostNameBindings', parameters('siteName'), parameters('dnsZoneName'))]"
+            ],
+            "properties": {
+                "serverFarmId": "[resourceId(resourceGroup().name,'Microsoft.Web/serverfarms/', variables('serverfarmName'))]",
+                "canonicalName": "[parameters('dnsZoneName')]",
+                "domainValidationMethod": "http-token"
+            }
+        },
+        {
+            "type": "Microsoft.Resources/deployments",
+            "apiVersion": "2021-04-01",
+            "name": "sslBinding",
+            "properties": {
+                "mode": "Incremental",
+                "template": {
+                    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+                    "contentVersion": "1.0.0.0",
+                    "resources": [
+                        {
+                            "type": "Microsoft.Web/sites/hostnameBindings",
+                            "name": "[concat(parameters('siteName'), '/', parameters('dnsZoneName'))]",
+                            "apiVersion": "2019-08-01",
+                            "location": "[resourceGroup().location]",
+                            "properties": {
+                                "sslState": "SniEnabled",
+                                "thumbprint": "[reference(resourceId('Microsoft.Web/certificates', concat(parameters('dnsZoneName'), '-cert'))).Thumbprint]"
+                            }
+                        }
+                    ]
+                }
+            }
+        }
+    ]
+}
