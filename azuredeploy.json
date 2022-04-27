@@ -73,7 +73,7 @@
             "name": "[variables('flexibleServerName')]",
             "location": "[resourceGroup().location]",
             "sku": {
-                "name": "Standard_B1s",
+                "name": "Standard_B1ms",
                 "tier": "Burstable"
             },
             "properties": {
