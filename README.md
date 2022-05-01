@@ -18,14 +18,16 @@ The aims of the project:
 - Be a cost effective deployment
 - Automated patching of [MySQL](https://docs.microsoft.com/azure/mysql/flexible-server/concepts-maintenance), and the [App Service OS and runtime](https://docs.microsoft.com/azure/app-service/overview-patch-os-runtime)
 - Locks are applied to all stateful data (storage account file share and MySQL database) to avoid accidental deletion
+- Azure Redis Cache can optionally be deployed for improved performance
 
 ## Costs
 The major costs are the App Service and the MySQL database. These are the most scaled down versions practical while allowing for the minimum required features.
 
 Estimates from the Azure console:
 
-- MySQL flexible server (Standard_B1s): AUD$16.83/month
+- MySQL flexible server (Standard_B1ms): AUD$29.86/month
 - App Service (B1): AUD$19.04/month
+- Redis Cache (C0 Basic): AUD$22.47/month (optional)
 
 There are additional costs for the storage account, DNS, custom domain and traffic egress.
 
@@ -49,11 +51,9 @@ Using third party DNS will prevent the automated verification of the custom doma
 
 ## Deployment
 ### Deploy the Template
-
 [![Deploy To Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fjamiemo%2Fwp-stateless%2Fmaster%2Fazuredeploy.json)
 
 ### Deploy WordPress to the App Service
-
 Once all components have successfully deployed, deploy WordPress using a bash [Azure Cloud Shell](https://portal.azure.com/#cloudshell/).
 
 If using a specific subscription switch to that:
@@ -71,6 +71,15 @@ This process can also be used to update WordPress to the latest version or recov
 Once the install is complete, navigate to Settings in the WordPress Dashboard and set the following URLs to be https:
 - WordPress Address (URL)
 - Site Address (URL)
+
+### Redis Cache (Optional)
+If deploying the Redis Cache option, the [Redis Object Cache](https://wordpress.org/plugins/redis-cache/) plugin must be installed into WordPress. All the required parameter configuration is completed during the deployment.
+
+From the WordPress Dashboard:
+- Select **Plugins** | **Add New**
+- Search for **Redis Object Cache** and click **Install Now**
+- Click **Activate** on the **Redis Object Cache** plugin
+- Click **Enable Object Cache** from **Settings** | **Redis**
 
 ## Compromises
 ### MySQL
@@ -90,7 +99,6 @@ Additional features that could be added at additional cost:
 
 - [Azure Backup](https://docs.microsoft.com/azure/backup/backup-afs) for the storage account file share
 - [Azure Front Door ](https://docs.microsoft.com/azure/frontdoor/front-door-waf) to scale and protect the App Service
-- Connect the App Service to [Redis Cache](https://github.com/uglide/azure-content/blob/master/articles/app-service-web/web-sites-connect-to-redis-using-memcache-protocol.md)
 - Connect resources via a private virtual network as above
 
 ## Demo Site
