@@ -3,19 +3,11 @@
     "contentVersion": "1.0.0.0",
     "parameters": {
         "siteName": {
-            "defaultValue": "wp-<sitename>",
+            "defaultValue": "<sitename>",
             "type": "String",
             "minLength": 5,
             "metadata": {
                 "description": "Specifies the name of the App Service."
-            }
-        },
-        "storageAccountName": {
-            "type": "string",
-            "defaultValue": "wp<sitename>",
-            "minLength": 5,
-            "metadata": {
-                "description": "Specifies the name of the Azure Storage account. Letters and numbers only."
             }
         },
         "dnsZoneName": {
@@ -31,6 +23,13 @@
             "type": "bool",
             "metadata": {
                 "description": "Specifies whether to deploy a public DNS zone. Domains purchased through App Service Domains will have this pre-created."
+            }
+        },
+        "deployRedisCache": {
+            "defaultValue": false,
+            "type": "bool",
+            "metadata": {
+                "description": "Specifies whether to deploy a Redis Cache, which requires additional WordPress configuration."
             }
         },
         "databaseName": {
@@ -60,10 +59,10 @@
         }
     },
     "variables": {
-        "serverfarmName": "[format('{0}-plan', parameters('siteName'))]",
-        "flexibleServerName": "[format('{0}-db', parameters('siteName'))]",
-        "virtualNetworkName": "[format('{0}-vnet', parameters('siteName'))]",
-        "virtualNetworkSubnet": "[format('{0}-subnet', parameters('siteName'))]",
+        "appServiceName": "[format('wp-{0}', parameters('siteName'))]",
+        "serverfarmName": "[format('{0}-plan', variables('appServiceName'))]",
+        "flexibleServerName": "[format('{0}-db', variables('appServiceName'))]",
+        "storageAccountName": "[format('wp{0}', parameters('siteName'))]",
         "fileShareName": "wp-content"
     },
     "resources": [
@@ -167,13 +166,13 @@
                 "TXTRecords": [
                     {
                         "value": [
-                            "[format('{0}', reference(resourceId('Microsoft.Web/sites', parameters('siteName'))).customDomainVerificationId)]"
+                            "[format('{0}', reference(resourceId('Microsoft.Web/sites', variables('appServiceName'))).customDomainVerificationId)]"
                         ]
                     }
                 ]
             },
             "dependsOn": [
-                "[resourceId('Microsoft.Web/sites', parameters('siteName'))]"
+                "[resourceId('Microsoft.Web/sites', variables('appServiceName'))]"
             ]
         },
         {
@@ -187,7 +186,7 @@
                 "TTL": 3600,
                 "ARecords": [
                     {
-                        "ipv4Address": "[format('{0}', reference(resourceId('Microsoft.Web/sites', parameters('siteName'))).inboundIpAddress)]"
+                        "ipv4Address": "[format('{0}', reference(resourceId('Microsoft.Web/sites', variables('appServiceName'))).inboundIpAddress)]"
                     }
                 ]
             }
@@ -195,7 +194,7 @@
         {
             "type": "Microsoft.Storage/storageAccounts",
             "apiVersion": "2021-08-01",
-            "name": "[parameters('storageAccountName')]",
+            "name": "[variables('storageAccountName')]",
             "location": "[resourceGroup().location]",
             "sku": {
                 "name": "Standard_LRS",
@@ -229,7 +228,7 @@
             }
         },
         {
-            "name": "[concat(parameters('storageAccountName'), '/default')]",
+            "name": "[concat(variables('storageAccountName'), '/default')]",
             "type": "Microsoft.Storage/storageAccounts/fileServices",
             "apiVersion": "2021-05-01",
             "properties": {
@@ -239,28 +238,28 @@
                 }
             },
             "dependsOn": [
-                "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName'))]"
+                "[resourceId('Microsoft.Storage/storageAccounts', variables('storageAccountName'))]"
             ]
         },
         {
             "type": "Microsoft.Storage/storageAccounts/fileServices/shares",
             "apiVersion": "2021-04-01",
-            "name": "[format('{0}/default/{1}', parameters('storageAccountName'), variables('fileShareName'))]",
+            "name": "[format('{0}/default/{1}', variables('storageAccountName'), variables('fileShareName'))]",
             "dependsOn": [
-                "[resourceId('Microsoft.Storage/storageAccounts/fileServices', parameters('storageAccountName'), 'default')]"
+                "[resourceId('Microsoft.Storage/storageAccounts/fileServices', variables('storageAccountName'), 'default')]"
             ]
         },
         {
             "type": "Microsoft.Authorization/locks",
             "apiVersion": "2017-04-01",
-            "scope": "[concat('Microsoft.Storage/storageAccounts/', parameters('storageAccountName'), '/fileServices/default/shares/', variables('fileShareName'))]",
-            "name": "[concat(parameters('storageAccountName'), '-lock')]",
+            "scope": "[concat('Microsoft.Storage/storageAccounts/', variables('storageAccountName'), '/fileServices/default/shares/', variables('fileShareName'))]",
+            "name": "[concat(variables('storageAccountName'), '-lock')]",
             "properties": {
                 "level": "CanNotDelete",
                 "notes": "Ensure data has been backed up before deleting."
             },
             "dependsOn": [
-                "[resourceId('Microsoft.Storage/storageAccounts/fileServices/shares', parameters('storageAccountName'), 'default', variables('fileShareName'))]"
+                "[resourceId('Microsoft.Storage/storageAccounts/fileServices/shares', variables('storageAccountName'), 'default', variables('fileShareName'))]"
             ]
         },
         {
@@ -292,22 +291,23 @@
         {
             "type": "Microsoft.Web/sites",
             "apiVersion": "2021-03-01",
-            "name": "[parameters('siteName')]",
+            "name": "[variables('appServiceName')]",
             "location": "[resourceGroup().location]",
             "dependsOn": [
-                "[resourceId('Microsoft.Web/serverfarms', variables('serverfarmName'))]"
+                "[resourceId('Microsoft.Web/serverfarms', variables('serverfarmName'))]",
+                "[resourceId('Microsoft.Cache/Redis', parameters('siteName'))]"              
             ],
             "kind": "app,linux",
             "properties": {
                 "enabled": true,
                 "hostNameSslStates": [
                     {
-                        "name": "[concat(parameters('siteName'), '.azurewebsites.net')]",
+                        "name": "[concat(variables('appServiceName'), '.azurewebsites.net')]",
                         "sslState": "Disabled",
                         "hostType": "Standard"
                     },
                     {
-                        "name": "[concat(parameters('siteName'), '.scm.azurewebsites.net')]",
+                        "name": "[concat(variables('appServiceName'), '.scm.azurewebsites.net')]",
                         "sslState": "Disabled",
                         "hostType": "Repository"
                     }
@@ -347,8 +347,17 @@
                         },
                         {
                             "name": "POST_BUILD_COMMAND",
-                            "value": "mv -v ./wordpress/* . ; mv -v ./wp-config-sample.php ./wp-config.php ; sed -i \"s/define( 'DB_NAME',.*/define( 'DB_NAME', getenv('DB_NAME') );/\" ./wp-config.php ; sed -i \"s/define( 'DB_USER',.*/define( 'DB_USER', getenv('DB_USER') );/\" ./wp-config.php ; sed -i \"s/define( 'DB_PASSWORD',.*/define( 'DB_PASSWORD', getenv('DB_PASSWORD') );/\" ./wp-config.php ; sed -i \"s/define( 'DB_HOST',.*/define( 'DB_HOST', getenv('DB_HOST') );/\" ./wp-config.php ; sed -i \"s/put your unique phrase here/$WEBSITE_AUTH_ENCRYPTION_KEY/g\" ./wp-config.php; rm -rf ./wordpress/; grep -q \"Azure App Service HTTPS\" /home/site/wwwroot/.htaccess || echo -e '\\n\\n# BEGIN Azure App Service HTTPS\\n<IfModule mod_setenvif.c>\\nSetEnvIf X-Forwarded-Proto \"^https$\" HTTPS\\n</IfModule>\\n# END Azure App Service HTTPS' >> /home/site/wwwroot/.htaccess"
+                            "value": "mv -v ./wordpress/* . ; mv -v ./wp-config-sample.php ./wp-config.php ; sed -i \"s/define( 'DB_NAME',.*/define( 'DB_NAME', getenv('DB_NAME') );/\" ./wp-config.php ; sed -i \"s/define( 'DB_USER',.*/define( 'DB_USER', getenv('DB_USER') );/\" ./wp-config.php ; sed -i \"s/define( 'DB_PASSWORD',.*/define( 'DB_PASSWORD', getenv('DB_PASSWORD') );/\" ./wp-config.php ; sed -i \"s/define( 'DB_HOST',.*/define( 'DB_HOST', getenv('DB_HOST') );/\" ./wp-config.php ; sed -i \"s/put your unique phrase here/$WEBSITE_AUTH_ENCRYPTION_KEY/g\" ./wp-config.php; sed -i \"/^.*DB_COLLATE.*$/a \\/** Redis Cache Configuration *\\/\\ndefine( 'WP_REDIS_HOST', getenv('WP_REDIS_HOST') );\\ndefine( 'WP_REDIS_PASSWORD', getenv('WP_REDIS_PASSWORD') );\\ndefine( 'WP_REDIS_SCHEME', 'tls' );\\ndefine( 'WP_REDIS_PORT', '6380' );\\n\" ./wp-config.php; rm -rf ./wordpress/; grep -q \"Azure App Service HTTPS\" /home/site/wwwroot/.htaccess || echo -e '\\n\\n# BEGIN Azure App Service HTTPS\\n<IfModule mod_setenvif.c>\\nSetEnvIf X-Forwarded-Proto \"^https$\" HTTPS\\n</IfModule>\\n# END Azure App Service HTTPS' >> /home/site/wwwroot/.htaccess"
                         },
+                                                {
+                            "name": "WP_REDIS_HOST",
+                            "value": "[if(parameters('deployRedisCache'), reference(resourceId('Microsoft.Cache/redis', parameters('siteName'))).hostName, json('null'))]"
+                        },
+                        {
+                            "name": "WP_REDIS_PASSWORD",
+                            "value": "[if(parameters('deployRedisCache'), listKeys(resourceId('Microsoft.Cache/Redis', parameters('siteName')), '2020-12-01').primaryKey, json('null'))]"
+                        },
+
                         {
                             "name": "ENABLE_ORYX_BUILD",
                             "value": "true"
@@ -375,19 +384,19 @@
         {
             "type": "Microsoft.Web/sites/config",
             "apiVersion": "2021-03-01",
-            "name": "[concat(parameters('siteName'), '/web')]",
+            "name": "[concat(variables('appServiceName'), '/web')]",
             "location": "[resourceGroup().location]",
             "dependsOn": [
-                "[resourceId('Microsoft.Web/sites', parameters('siteName'))]"
+                "[resourceId('Microsoft.Web/sites', variables('appServiceName'))]"
             ],
             "properties": {
                 "azureStorageAccounts": {
                     "[variables('fileShareName')]": {
                         "type": "AzureFiles",
-                        "accountName": "[parameters('storageAccountName')]",
+                        "accountName": "[variables('storageAccountName')]",
                         "shareName": "[variables('fileShareName')]",
                         "mountPath": "[concat('/home/site/wwwroot/', variables('fileShareName'))]",
-                        "accessKey": "[listKeys(resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName')), '2019-04-01').keys[0].value]"
+                        "accessKey": "[listKeys(resourceId('Microsoft.Storage/storageAccounts', variables('storageAccountName')), '2019-04-01').keys[0].value]"
                     }
                 }
             }
@@ -395,29 +404,29 @@
         {
             "type": "Microsoft.Web/sites/hostNameBindings",
             "apiVersion": "2021-03-01",
-            "name": "[concat(parameters('siteName'), '/', parameters('siteName'), '.azurewebsites.net')]",
+            "name": "[concat(variables('appServiceName'), '/', variables('appServiceName'), '.azurewebsites.net')]",
             "location": "[resourceGroup().location]",
             "dependsOn": [
-                "[resourceId('Microsoft.Web/sites', parameters('siteName'))]"
+                "[resourceId('Microsoft.Web/sites', variables('appServiceName'))]"
             ],
             "properties": {
-                "siteName": "[parameters('siteName')]",
+                "siteName": "[variables('appServiceName')]",
                 "hostNameType": "Verified"
             }
         },
         {
             "type": "Microsoft.Web/sites/hostNameBindings",
             "apiVersion": "2021-03-01",
-            "name": "[concat(parameters('siteName'), '/', parameters('dnsZoneName'))]",
+            "name": "[concat(variables('appServiceName'), '/', parameters('dnsZoneName'))]",
             "location": "[resourceGroup().location]",
             "dependsOn": [
-                "[resourceId('Microsoft.Web/sites', parameters('siteName'))]",
+                "[resourceId('Microsoft.Web/sites', variables('appServiceName'))]",
                 "[resourceId('Microsoft.Network/dnsZones/A', parameters('dnsZoneName'), '@')]",
                 "[resourceId('Microsoft.Network/dnsZones/TXT', parameters('dnsZoneName'), 'asuid')]",
-                "[resourceId('Microsoft.Web/sites/hostNameBindings', parameters('siteName'), concat(parameters('siteName'), '.azurewebsites.net'))]"
+                "[resourceId('Microsoft.Web/sites/hostNameBindings', variables('appServiceName'), concat(variables('appServiceName'), '.azurewebsites.net'))]"
             ],
             "properties": {
-                "siteName": "[parameters('siteName')]",
+                "siteName": "[variables('appServiceName')]",
                 "hostNameType": "Verified"
             }
         },
@@ -430,12 +439,28 @@
                 "[resourceId('Microsoft.Web/serverfarms', variables('serverfarmName'))]",
                 "[resourceId('Microsoft.Network/dnsZones/A', parameters('dnsZoneName'), '@')]",
                 "[resourceId('Microsoft.Network/dnsZones/TXT', parameters('dnsZoneName'), 'asuid')]",
-                "[resourceId('Microsoft.Web/sites/hostNameBindings', parameters('siteName'), parameters('dnsZoneName'))]"
+                "[resourceId('Microsoft.Web/sites/hostNameBindings', variables('appServiceName'), parameters('dnsZoneName'))]"
             ],
             "properties": {
                 "serverFarmId": "[resourceId(resourceGroup().name,'Microsoft.Web/serverfarms/', variables('serverfarmName'))]",
                 "canonicalName": "[parameters('dnsZoneName')]",
                 "domainValidationMethod": "http-token"
+            }
+        },
+        {
+            "type": "Microsoft.Cache/Redis",
+            "apiVersion": "2021-06-01",
+            "name": "[parameters('siteName')]",
+            "condition": "[parameters('deployRedisCache')]",
+            "location": "[resourceGroup().location]",
+            "properties": {
+                "sku": {
+                    "name": "Basic",
+                    "family": "C",
+                    "capacity": 0
+                },
+                "enableNonSslPort": false,
+                "publicNetworkAccess": "Enabled"
             }
         },
         {
@@ -450,7 +475,7 @@
                     "resources": [
                         {
                             "type": "Microsoft.Web/sites/hostnameBindings",
-                            "name": "[concat(parameters('siteName'), '/', parameters('dnsZoneName'))]",
+                            "name": "[concat(variables('appServiceName'), '/', parameters('dnsZoneName'))]",
                             "apiVersion": "2019-08-01",
                             "location": "[resourceGroup().location]",
                             "properties": {
