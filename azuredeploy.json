@@ -59,9 +59,10 @@
         }
     },
     "variables": {
-        "appServiceName": "[format('wp-{0}', parameters('siteName'))]",
-        "serverfarmName": "[format('{0}-plan', variables('appServiceName'))]",
-        "flexibleServerName": "[format('{0}-db', variables('appServiceName'))]",
+        "appServiceName": "[format('wp-{0}-app', parameters('siteName'))]",
+        "serverfarmName": "[format('wp-{0}-plan', parameters('siteName'))]",
+        "flexibleServerName": "[format('wp-{0}-db', parameters('siteName'))]",
+        "redisCacheName": "[format('wp-{0}-cache', parameters('siteName'))]",
         "storageAccountName": "[format('wp{0}', parameters('siteName'))]",
         "fileShareName": "wp-content"
     },
@@ -295,7 +296,7 @@
             "location": "[resourceGroup().location]",
             "dependsOn": [
                 "[resourceId('Microsoft.Web/serverfarms', variables('serverfarmName'))]",
-                "[resourceId('Microsoft.Cache/Redis', parameters('siteName'))]"              
+                "[resourceId('Microsoft.Cache/Redis', variables('redisCacheName'))]"              
             ],
             "kind": "app,linux",
             "properties": {
@@ -351,11 +352,11 @@
                         },
                                                 {
                             "name": "WP_REDIS_HOST",
-                            "value": "[if(parameters('deployRedisCache'), reference(resourceId('Microsoft.Cache/redis', parameters('siteName'))).hostName, json('null'))]"
+                            "value": "[if(parameters('deployRedisCache'), reference(resourceId('Microsoft.Cache/redis', variables('redisCacheName'))).hostName, json('null'))]"
                         },
                         {
                             "name": "WP_REDIS_PASSWORD",
-                            "value": "[if(parameters('deployRedisCache'), listKeys(resourceId('Microsoft.Cache/Redis', parameters('siteName')), '2020-12-01').primaryKey, json('null'))]"
+                            "value": "[if(parameters('deployRedisCache'), listKeys(resourceId('Microsoft.Cache/Redis', variables('redisCacheName')), '2020-12-01').primaryKey, json('null'))]"
                         },
 
                         {
@@ -450,7 +451,7 @@
         {
             "type": "Microsoft.Cache/Redis",
             "apiVersion": "2021-06-01",
-            "name": "[parameters('siteName')]",
+            "name": "[variables('redisCacheName')]",
             "condition": "[parameters('deployRedisCache')]",
             "location": "[resourceGroup().location]",
             "properties": {
