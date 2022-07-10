@@ -296,7 +296,7 @@
             "location": "[resourceGroup().location]",
             "dependsOn": [
                 "[resourceId('Microsoft.Web/serverfarms', variables('serverfarmName'))]",
-                "[resourceId('Microsoft.Cache/Redis', variables('redisCacheName'))]"              
+                "[resourceId('Microsoft.Cache/Redis', variables('redisCacheName'))]"
             ],
             "kind": "app,linux",
             "properties": {
@@ -323,6 +323,7 @@
                     "acrUseManagedIdentityCreds": false,
                     "alwaysOn": true,
                     "http20Enabled": true,
+                    "healthCheckPath": "/readme.html",
                     "ftpsState": "Disabled",
                     "functionAppScaleLimit": 0,
                     "minimumElasticInstanceCount": 0,
@@ -351,7 +352,7 @@
                             "name": "POST_BUILD_COMMAND",
                             "value": "mv -v ./wordpress/* . ; mv -v ./wp-config-sample.php ./wp-config.php ; sed -i \"s/define( 'DB_NAME',.*/define( 'DB_NAME', getenv('DB_NAME') );/\" ./wp-config.php ; sed -i \"s/define( 'DB_USER',.*/define( 'DB_USER', getenv('DB_USER') );/\" ./wp-config.php ; sed -i \"s/define( 'DB_PASSWORD',.*/define( 'DB_PASSWORD', getenv('DB_PASSWORD') );/\" ./wp-config.php ; sed -i \"s/define( 'DB_HOST',.*/define( 'DB_HOST', getenv('DB_HOST') );/\" ./wp-config.php ; sed -i \"s/put your unique phrase here/$WEBSITE_AUTH_ENCRYPTION_KEY/g\" ./wp-config.php; sed -i \"/^.*DB_COLLATE.*$/a \\/** Redis Cache Configuration *\\/\\ndefine( 'WP_REDIS_HOST', getenv('WP_REDIS_HOST') );\\ndefine( 'WP_REDIS_PASSWORD', getenv('WP_REDIS_PASSWORD') );\\ndefine( 'WP_REDIS_SCHEME', 'tls' );\\ndefine( 'WP_REDIS_PORT', '6380' );\\ndefine( 'WP_REDIS_TIMEOUT', '5' );\\ndefine( 'WP_REDIS_READ_TIMEOUT', '5' );\" ./wp-config.php; rm -rf ./wordpress/; grep -q \"Azure App Service HTTPS\" /home/site/wwwroot/.htaccess || echo -e '\\n\\n# BEGIN Azure App Service HTTPS\\n<IfModule mod_setenvif.c>\\nSetEnvIf X-Forwarded-Proto \"^https$\" HTTPS\\n</IfModule>\\n# END Azure App Service HTTPS' >> /home/site/wwwroot/.htaccess"
                         },
-                                                {
+                        {
                             "name": "WP_REDIS_HOST",
                             "value": "[if(parameters('deployRedisCache'), reference(resourceId('Microsoft.Cache/redis', variables('redisCacheName'))).hostName, json('null'))]"
                         },

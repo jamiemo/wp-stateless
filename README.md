@@ -68,7 +68,7 @@ You can now navigate to the website and complete the WordPress install process.
 
 This process can also be used to update WordPress to the latest version or recover from a compromise.
 
-Once the install is complete, navigate to Settings in the WordPress Dashboard and set the following URLs to be https:
+Once the install is complete, navigate to **Settings** in the WordPress Dashboard and set the following URLs to be https:
 - WordPress Address (URL)
 - Site Address (URL)
 
