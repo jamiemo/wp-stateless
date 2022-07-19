@@ -25,6 +25,13 @@
                 "description": "Specifies whether to deploy a public DNS zone. Domains purchased through App Service Domains will have this pre-created."
             }
         },
+         "useThirdPartyDns": {
+            "defaultValue": false,
+            "type": "bool",
+            "metadata": {
+                "description": "Specifies whether to use a third party DNS service. Custom domain and certificate verification will need to be done by redeploying the template once the A and TXT records are created."
+            }
+        },
         "deployRedisCache": {
             "defaultValue": false,
             "type": "bool",
@@ -85,7 +92,6 @@
                     "autoGrow": "Enabled"
                 },
                 "version": "5.7",
-                "availabilityZone": "1",
                 "replicationRole": "None",
                 "network": {},
                 "backup": {
@@ -152,7 +158,7 @@
             "type": "Microsoft.Network/dnszones",
             "apiVersion": "2018-05-01",
             "name": "[parameters('dnsZoneName')]",
-            "condition": "[parameters('deployDnsZone')]",
+            "condition": "[and(parameters('deployDnsZone'), not(parameters('useThirdPartyDns')))]",
             "location": "global",
             "properties": {
                 "zoneType": "Public"
@@ -162,6 +168,7 @@
             "type": "Microsoft.Network/dnsZones/TXT",
             "apiVersion": "2018-05-01",
             "name": "[format('{0}/asuid', parameters('dnsZoneName'))]",
+            "condition": "[not(parameters('useThirdPartyDns'))]",
             "properties": {
                 "TTL": 3600,
                 "TXTRecords": [
@@ -180,6 +187,7 @@
             "type": "Microsoft.Network/dnsZones/A",
             "apiVersion": "2018-05-01",
             "name": "[concat(parameters('dnsZoneName'), '/@')]",
+            "condition": "[not(parameters('useThirdPartyDns'))]",
             "dependsOn": [
                 "[resourceId('Microsoft.Network/dnsZones', parameters('dnsZoneName'))]"
             ],
@@ -424,8 +432,6 @@
             "location": "[resourceGroup().location]",
             "dependsOn": [
                 "[resourceId('Microsoft.Web/sites', variables('appServiceName'))]",
-                "[resourceId('Microsoft.Network/dnsZones/A', parameters('dnsZoneName'), '@')]",
-                "[resourceId('Microsoft.Network/dnsZones/TXT', parameters('dnsZoneName'), 'asuid')]",
                 "[resourceId('Microsoft.Web/sites/hostNameBindings', variables('appServiceName'), concat(variables('appServiceName'), '.azurewebsites.net'))]"
             ],
             "properties": {
@@ -480,7 +486,7 @@
                             "type": "Microsoft.Web/sites/hostnameBindings",
                             "name": "[concat(variables('appServiceName'), '/', parameters('dnsZoneName'))]",
                             "apiVersion": "2019-08-01",
-                            "location": "[resourceGroup().location]",
+                           "location": "[resourceGroup().location]",
                             "properties": {
                                 "sslState": "SniEnabled",
                                 "thumbprint": "[reference(resourceId('Microsoft.Web/certificates', concat(parameters('dnsZoneName'), '-cert'))).Thumbprint]"

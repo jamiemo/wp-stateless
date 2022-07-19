@@ -47,7 +47,7 @@ Due to the difficulty experienced when trying to register an App Service Domain 
 
 Another alternative is to set Deploy DNS Zone to `true`, and this will deploy the Azure DNS, but fail to verify the custom domain and certificate until the public delegation of the custom domain to the Azure DNS name servers. The template can be redeployed once this is done to complete the deployment incrementally and bind the custom domain and App Service Managed Certificate.
 
-Using third party DNS will prevent the automated verification of the custom domain and App Service Managed Certificate.
+Using third party DNS set to `true` will prevent the automated verification of the custom domain and App Service Managed Certificate, until the appropriate A and TXT records are created. The template can be redeployed once this is done to complete the deployment incrementally and bind the custom domain and App Service Managed Certificate.
 
 ## Deployment
 ### Deploy the Template
