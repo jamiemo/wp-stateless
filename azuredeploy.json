@@ -423,7 +423,7 @@
                         "accountName": "[variables('storageAccountName')]",
                         "shareName": "[variables('fileShareName')]",
                         "mountPath": "[concat('/home/site/wwwroot/', variables('fileShareName'))]",
-                        "accessKey": "[listKeys(resourceId('Microsoft.Storage/storageAccounts', variables('storageAccountName')), '2019-04-01').keys[0].value]"
+                        "accessKey": "[if(parameters('useStorageAccount'), listKeys(resourceId('Microsoft.Storage/storageAccounts', variables('storageAccountName')), '2019-04-01').keys[0].value, json('null'))]"
                     }
                 }
             }
