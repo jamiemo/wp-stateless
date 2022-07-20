@@ -32,6 +32,13 @@
                 "description": "Specifies whether to use a third party DNS service. Custom domain and certificate verification will need to be done by redeploying the template once the A and TXT records are created."
             }
         },
+        "useStorageAccount": {
+            "defaultValue": false,
+            "type": "bool",
+            "metadata": {
+                "description": "Specifies whether to deploy a premium storage account fileshare for the wp-content folder. Impacts on performance and cost, minimum 100GB allocation."
+            }
+        },
         "deployRedisCache": {
             "defaultValue": false,
             "type": "bool",
@@ -205,6 +212,7 @@
             "apiVersion": "2021-08-01",
             "name": "[variables('storageAccountName')]",
             "location": "[resourceGroup().location]",
+            "condition": "[parameters('useStorageAccount')]",
             "sku": {
                 "name": "Premium_LRS",
                 "tier": "Premium"
@@ -240,6 +248,7 @@
             "name": "[concat(variables('storageAccountName'), '/default')]",
             "type": "Microsoft.Storage/storageAccounts/fileServices",
             "apiVersion": "2021-05-01",
+            "condition": "[parameters('useStorageAccount')]",
             "sku": {
                 "name": "Premium_LRS",
                 "tier": "Premium"
@@ -258,6 +267,7 @@
             "type": "Microsoft.Storage/storageAccounts/fileServices/shares",
             "apiVersion": "2021-04-01",
             "name": "[format('{0}/default/{1}', variables('storageAccountName'), variables('fileShareName'))]",
+            "condition": "[parameters('useStorageAccount')]",
             "dependsOn": [
                 "[resourceId('Microsoft.Storage/storageAccounts/fileServices', variables('storageAccountName'), 'default')]"
             ]
@@ -267,6 +277,7 @@
             "apiVersion": "2017-04-01",
             "scope": "[concat('Microsoft.Storage/storageAccounts/', variables('storageAccountName'), '/fileServices/default/shares/', variables('fileShareName'))]",
             "name": "[concat(variables('storageAccountName'), '-lock')]",
+            "condition": "[parameters('useStorageAccount')]",
             "properties": {
                 "level": "CanNotDelete",
                 "notes": "Ensure data has been backed up before deleting."
@@ -281,10 +292,10 @@
             "name": "[variables('serverfarmName')]",
             "location": "[resourceGroup().location]",
             "sku": {
-                "name": "B1",
-                "tier": "Basic",
-                "size": "B1",
-                "family": "B",
+                "name": "P1v2",
+                "tier": "PremiumV2",
+                "size": "P1v2",
+                "family": "Pv2",
                 "capacity": 1
             },
             "kind": "linux",
@@ -401,6 +412,7 @@
             "apiVersion": "2021-03-01",
             "name": "[concat(variables('appServiceName'), '/web')]",
             "location": "[resourceGroup().location]",
+            "condition": "[parameters('useStorageAccount')]",
             "dependsOn": [
                 "[resourceId('Microsoft.Web/sites', variables('appServiceName'))]"
             ],

@@ -1,6 +1,8 @@
 # Stateless WordPress in Azure
 This project is to deploy WordPress on Azure in a cost effective and secure deployment. Not really stateless, but the state is contained within a MySQL flexible database and a storage account file share, allowing WordPress to be redeployed without concern for the installation.
 
+Due to the poor performance of the storage account, even using the premium option, and the excessive cost of writes, the use of a storage account for the wp-content directory is no longer a default option. To protect the data in the wp-content in lieu of a storage account for the data, a Production P1V2 plan is used that provides hourly backup for 30 days to mitigate the risk of data loss or coruption.
+
 The typical deployment of the database and web server on a single instance can be noteably cheaper, but is fraught with issues:
 
 - How do you protect the instance or recover in the event of a hack?  
@@ -12,13 +14,13 @@ The aims of the project:
 
 - Use only Azure services, not third party domain registration or SSL, where possible
 - Deploy the latest version of WordPress in an automated manner (not waiting for third parties to package)
-- Have some form of backup (30 days MySQL snapshots and 30 days soft delete on the storage account file share)
+- Have some form of backup (30 days MySQL snapshots and 30 days soft delete on the storage account file share/Production P1V2 hourly backups for 30 days)
 - Use a custom domain with SSL/TLS
 - Scalable web and database tiers
 - Be a cost effective deployment
 - Automated patching of [MySQL](https://docs.microsoft.com/azure/mysql/flexible-server/concepts-maintenance), and the [App Service OS and runtime](https://docs.microsoft.com/azure/app-service/overview-patch-os-runtime)
 - Locks are applied to all stateful data (storage account file share and MySQL database) to avoid accidental deletion
-- Azure Redis Cache can optionally be deployed for improved performance
+- Azure Redis Cache can optionally be deployed to reduce database load
 
 ## Costs
 The major costs are the App Service and the MySQL database. These are the most scaled down versions practical while allowing for the minimum required features.
@@ -26,7 +28,7 @@ The major costs are the App Service and the MySQL database. These are the most s
 Estimates from the Azure console:
 
 - MySQL flexible server (Standard_B1ms): AUD$29.86/month
-- App Service (B1): AUD$19.04/month
+- App Service (P1V2): AUD$123.28/month
 - Redis Cache (C0 Basic): AUD$22.47/month (optional)
 
 There are additional costs for the storage account, DNS, custom domain and traffic egress.
@@ -62,7 +64,7 @@ If using a specific subscription switch to that:
 
 Deploy the latest WordPress from wordpress.org:
 
-`az webapp deploy --resource-group <resource group> --name <app service> --clean true --type zip --src-url https://wordpress.org/latest.zip`
+`az webapp deploy --resource-group <resource group> --name <app service> --type zip --src-url https://wordpress.org/latest.zip`
 
 You can now navigate to the website and complete the WordPress install process.
 
