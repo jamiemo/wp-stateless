@@ -448,6 +448,8 @@
             "location": "[resourceGroup().location]",
             "dependsOn": [
                 "[resourceId('Microsoft.Web/sites', variables('appServiceName'))]",
+                "[resourceId('Microsoft.Network/dnsZones/A', parameters('dnsZoneName'), '@')]",
+                "[resourceId('Microsoft.Network/dnsZones/TXT', parameters('dnsZoneName'), 'asuid')]",
                 "[resourceId('Microsoft.Web/sites/hostNameBindings', variables('appServiceName'), concat(variables('appServiceName'), '.azurewebsites.net'))]"
             ],
             "properties": {
