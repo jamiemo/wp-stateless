@@ -475,6 +475,20 @@
             }
         },
         {
+            "type": "Microsoft.Authorization/locks",
+            "apiVersion": "2017-04-01",
+            "scope": "[concat('Microsoft.Web/sites/', variables('appServiceName'))]",
+            "name": "[concat(variables('appServiceName'), '-lock')]",
+            "condition": "[not(parameters('useStorageAccount'))]",
+            "properties": {
+                "level": "CanNotDelete",
+                "notes": "Ensure data has been backed up before deleting."
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/sites', variables('appServiceName'))]"
+            ]
+        },
+        {
             "type": "Microsoft.Cache/Redis",
             "apiVersion": "2021-06-01",
             "name": "[variables('redisCacheName')]",

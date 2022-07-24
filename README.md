@@ -1,7 +1,7 @@
 # Stateless WordPress in Azure
 This project is to deploy WordPress on Azure in a cost effective and secure deployment. Not really stateless, but the state is contained within a MySQL flexible database and a storage account file share, allowing WordPress to be redeployed without concern for the installation.
 
-Due to the poor performance of the storage account, even using the premium option, and the excessive cost of writes, the use of a storage account for the wp-content directory is no longer a default option. To protect the data in the wp-content in lieu of a storage account for the data, a Production P1V2 plan is used that provides hourly backup for 30 days to mitigate the risk of data loss or coruption.
+Due to the poor performance of the storage account, even using the premium option, and the excessive cost of writes, the use of a storage account for the wp-content directory is no longer a default option. To protect the data in the wp-content in lieu of a storage account for the data, a Production P1V2 plan is used that provides hourly backup for 30 days to mitigate the risk of data loss or coruption. Use the Use Storage Account option set to `true` if there is a need to deploy multiple instances, so the resources will be available to all instances.
 
 The typical deployment of the database and web server on a single instance can be noteably cheaper, but is fraught with issues:
 
@@ -19,7 +19,7 @@ The aims of the project:
 - Scalable web and database tiers
 - Be a cost effective deployment
 - Automated patching of [MySQL](https://docs.microsoft.com/azure/mysql/flexible-server/concepts-maintenance), and the [App Service OS and runtime](https://docs.microsoft.com/azure/app-service/overview-patch-os-runtime)
-- Locks are applied to all stateful data (storage account file share and MySQL database) to avoid accidental deletion
+- Locks are applied to all stateful data (storage account file share or App Service, and MySQL database) to avoid accidental deletion
 - Azure Redis Cache can optionally be deployed to reduce database load
 
 ## Costs
