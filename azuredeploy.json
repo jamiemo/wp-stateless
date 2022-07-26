@@ -369,7 +369,7 @@
                         },
                         {
                             "name": "PRE_BUILD_COMMAND",
-                            "value": "for DIRECTORY in $(ls -d /home/site/wwwroot/*/ | grep -v wp-content); do rm -rf $DIRECTORY; done; for FILE in $(ls /home/site/wwwroot/* | grep -v wp-content); do rm -f $FILE; done"
+                            "value": "for DIRECTORY in $(ls -d /home/site/wwwroot/*/ | grep -v wp-content); do rm -rf $DIRECTORY; done; for FILE in $(ls /home/site/wwwroot/* | grep -Ev 'wp-content|favicon'); do rm -f $FILE; done"
                         },
                         {
                             "name": "POST_BUILD_COMMAND",
