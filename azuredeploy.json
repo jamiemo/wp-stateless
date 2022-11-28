@@ -25,7 +25,7 @@
                 "description": "Specifies whether to deploy a public DNS zone. Domains purchased through App Service Domains will have this pre-created."
             }
         },
-         "useThirdPartyDns": {
+        "useThirdPartyDns": {
             "defaultValue": false,
             "type": "bool",
             "metadata": {
@@ -342,7 +342,8 @@
                 "hyperV": false,
                 "siteConfig": {
                     "numberOfWorkers": 1,
-                    "linuxFxVersion": "PHP|7.4",
+                    "linuxFxVersion": "PHP|8.1",
+                    "appCommandLine": "/home/site/startup.sh",
                     "acrUseManagedIdentityCreds": false,
                     "alwaysOn": true,
                     "http20Enabled": true,
@@ -373,7 +374,7 @@
                         },
                         {
                             "name": "POST_BUILD_COMMAND",
-                            "value": "mv -v ./wordpress/* . ; mv -v ./wp-config-sample.php ./wp-config.php ; sed -i \"s/define( 'DB_NAME',.*/define( 'DB_NAME', getenv('DB_NAME') );/\" ./wp-config.php ; sed -i \"s/define( 'DB_USER',.*/define( 'DB_USER', getenv('DB_USER') );/\" ./wp-config.php ; sed -i \"s/define( 'DB_PASSWORD',.*/define( 'DB_PASSWORD', getenv('DB_PASSWORD') );/\" ./wp-config.php ; sed -i \"s/define( 'DB_HOST',.*/define( 'DB_HOST', getenv('DB_HOST') );/\" ./wp-config.php ; sed -i \"s/put your unique phrase here/$WEBSITE_AUTH_ENCRYPTION_KEY/g\" ./wp-config.php; sed -i \"/^.*DB_COLLATE.*$/a \\/** Redis Cache Configuration *\\/\\ndefine( 'WP_REDIS_HOST', getenv('WP_REDIS_HOST') );\\ndefine( 'WP_REDIS_PASSWORD', getenv('WP_REDIS_PASSWORD') );\\ndefine( 'WP_REDIS_SCHEME', 'tls' );\\ndefine( 'WP_REDIS_PORT', '6380' );\\ndefine( 'WP_REDIS_TIMEOUT', '5' );\\ndefine( 'WP_REDIS_READ_TIMEOUT', '5' );\" ./wp-config.php; rm -rf ./wordpress/; grep -q \"Azure App Service HTTPS\" /home/site/wwwroot/.htaccess || echo -e '\\n\\n# BEGIN Azure App Service HTTPS\\n<IfModule mod_setenvif.c>\\nSetEnvIf X-Forwarded-Proto \"^https$\" HTTPS\\n</IfModule>\\n# END Azure App Service HTTPS' >> /home/site/wwwroot/.htaccess"
+                            "value": "mv -v ./wordpress/* . ; mv -v ./wp-config-sample.php ./wp-config.php ; sed -i \"s/define( 'DB_NAME',.*/define( 'DB_NAME', getenv('DB_NAME') );/\" ./wp-config.php ; sed -i \"s/define( 'DB_USER',.*/define( 'DB_USER', getenv('DB_USER') );/\" ./wp-config.php ; sed -i \"s/define( 'DB_PASSWORD',.*/define( 'DB_PASSWORD', getenv('DB_PASSWORD') );/\" ./wp-config.php ; sed -i \"s/define( 'DB_HOST',.*/define( 'DB_HOST', getenv('DB_HOST') );/\" ./wp-config.php ; sed -i \"s/put your unique phrase here/$WEBSITE_AUTH_ENCRYPTION_KEY/g\" ./wp-config.php; sed -i \"/^.*DB_COLLATE.*$/a \\/** Redis Cache Configuration *\\/\\ndefine( 'WP_REDIS_HOST', getenv('WP_REDIS_HOST') );\\ndefine( 'WP_REDIS_PASSWORD', getenv('WP_REDIS_PASSWORD') );\\ndefine( 'WP_REDIS_SCHEME', 'tls' );\\ndefine( 'WP_REDIS_PORT', '6380' );\\ndefine( 'WP_REDIS_TIMEOUT', '5' );\\ndefine( 'WP_REDIS_READ_TIMEOUT', '5' );\" ./wp-config.php; rm -rf ./wordpress/; echo -e '# WARNING: File is overwritten on App Service deploy.\\nserver {\\n\\tlisten 8080;\\n\\tlisten [::]:8080;\\n\\troot /home/site/wwwroot;\\n\\tindex  index.php index.html index.htm;\\n\\tserver_name  example.com www.example.com;\\n \\tport_in_redirect off;\\n\\n\\tlocation / {\\n \\t\\tindex  index.php index.html index.htm hostingstart.html;\\n\\t\\ttry_files $uri $uri/ /index.php?$args;\\n\\t}\\n\\n\\terror_page   500 502 503 504  /50x.html;\\n\\tlocation = /50x.html {\\n\\t\\troot   /html/;\\n\\t}\\n\\n\\t# Disable .git directory\\n\\tlocation ~ /\\.git {\\n\\t\\tdeny all;\\n\\t\\taccess_log off;\\n\\t\\tlog_not_found off;\\n\\t}\\n\\n\\t# Add locations of phpmyadmin here.\\n\\tlocation ~ [^/]\\.php(/|$) {\\n\\t\\tfastcgi_split_path_info ^(.+?\\.php)(|/.*)$;\\n\\t\\tfastcgi_pass 127.0.0.1:9000;\\n\\t\\tinclude fastcgi_params;\\n\\t\\tfastcgi_param HTTP_PROXY \"\";\\n\\t\\tfastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;\\n\\t\\tfastcgi_param PATH_INFO $fastcgi_path_info;\\n\\t\\tfastcgi_param QUERY_STRING $query_string;\\n\\t\\tfastcgi_intercept_errors on;\\n\\t\\tfastcgi_connect_timeout\\t300;\\n\\t\\tfastcgi_send_timeout\\t3600;\\n\\t\\tfastcgi_read_timeout\\t3600;\\n\\t\\tfastcgi_buffer_size 128k;\\n\\t\\tfastcgi_buffers 4 256k;\\n\\t\\tfastcgi_busy_buffers_size 256k;\\n\\t\\tfastcgi_temp_file_write_size 256k;\\n\\t}\\n}' > /home/site/default; sed -i \"/^.*WordPress vars.*$/i\/* https:\/\/developer.wordpress.org\/reference\/functions\/is_ssl\/ *\/\\nif (isset(\\$_SERVER['HTTP_X_FORWARDED_PROTO']) && \\$_SERVER['HTTP_X_FORWARDED_PROTO'] == 'https')\\n\\t\\$_SERVER['HTTPS'] = 'on';\\n\" ./wp-config.php; echo -e '#!/bin/bash\\n\\ncp /home/site/default /etc/nginx/sites-available/default\\nservice nginx reload' > /home/site/startup.sh; chmod u+x /home/site/startup.sh"
                         },
                         {
                             "name": "WP_REDIS_HOST",
@@ -518,7 +519,7 @@
                             "type": "Microsoft.Web/sites/hostnameBindings",
                             "name": "[concat(variables('appServiceName'), '/', parameters('dnsZoneName'))]",
                             "apiVersion": "2019-08-01",
-                           "location": "[resourceGroup().location]",
+                            "location": "[resourceGroup().location]",
                             "properties": {
                                 "sslState": "SniEnabled",
                                 "thumbprint": "[reference(resourceId('Microsoft.Web/certificates', concat(parameters('dnsZoneName'), '-cert'))).Thumbprint]"
@@ -528,5 +529,11 @@
                 }
             }
         }
-    ]
+    ],
+    "outputs": {
+        "deploy": {
+            "type": "string",
+            "value": "[concat('az webapp deploy --resource-group ', resourceGroup().name, ' --name ', variables('appServiceName') , ' --type zip --src-url https://wordpress.org/latest.zip')]"
+        }
+    }
 }
