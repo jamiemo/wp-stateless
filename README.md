@@ -104,4 +104,4 @@ Additional features that could be added at additional cost:
 - Connect resources via a private virtual network as above
 
 ## Demo Site
-A demo site deployed using this template is available here: [https://statelesswordpress.com](https://statelesswordpress.com)
+A demo site deployed using this template is available here: [http://statelesswordpress.com](http://statelesswordpress.com)
