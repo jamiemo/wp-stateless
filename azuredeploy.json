@@ -98,7 +98,7 @@
                     "iops": 360,
                     "autoGrow": "Enabled"
                 },
-                "version": "5.7",
+                "version": "8.0",
                 "replicationRole": "None",
                 "network": {},
                 "backup": {
