@@ -342,7 +342,7 @@
                 "hyperV": false,
                 "siteConfig": {
                     "numberOfWorkers": 1,
-                    "linuxFxVersion": "PHP|8.1",
+                    "linuxFxVersion": "PHP|8.2",
                     "appCommandLine": "/home/site/startup.sh",
                     "acrUseManagedIdentityCreds": false,
                     "alwaysOn": true,
